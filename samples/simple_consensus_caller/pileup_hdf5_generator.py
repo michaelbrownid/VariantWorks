@@ -96,9 +96,9 @@ def create_pileup(data_dir):
     subprocess.check_call(pileup_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
     # Remove intermediate files
-    files = glob.glob(os.path.join(data_dir, "*_{}.*bam*".format(suffix)))
-    for f in files:
-        os.remove(f)
+    # files = glob.glob(os.path.join(data_dir, "*_{}.*bam*".format(suffix)))
+    # for f in files:
+    #     os.remove(f)
 
     return FileRegion(start_pos=0, end_pos=None, file_path=mpileup_file)
 
@@ -130,7 +130,8 @@ def encode(sample_encoder, label_encoder, chunk_len, chunk_ovlp, data_dir, remov
         if remove_data_dir:
             shutil.rmtree(data_dir)
         else:
-            os.remove(region.file_path)  # remove mpileup file
+            print("mbrown remove pileup")
+            #os.remove(region.file_path)  # remove mpileup file
         encoding_chunks = sliding_window(encoding, chunk_len, step=chunk_len - chunk_ovlp)
         position_chunks = sliding_window(encoding_positions, chunk_len, step=chunk_len - chunk_ovlp)
         label_chunks = sliding_window(label, chunk_len, step=chunk_len - chunk_ovlp)
@@ -277,6 +278,8 @@ def generate_hdf5(args):
             args.draft_file, args.subreads_file, draft_to_ref_path, working_dir
         )
         to_remove_data_dir = True
+
+    print("mbrown to_remove_data_dir",to_remove_data_dir)
 
     # Setup encoder for samples and labels.
     sample_encoder = SummaryEncoder(exclude_no_coverage_positions=True)

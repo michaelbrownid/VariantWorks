@@ -65,6 +65,7 @@ class FastxWriter(BaseWriter):
             description : sequence record description (optional).
             record_quality : Corresponding records' sequence quality.
         """
+
         kargs = {
             'seq': Seq(record_sequence),
             'id': record_id,
@@ -75,8 +76,8 @@ class FastxWriter(BaseWriter):
             kargs['description'] = description
         record = SeqRecord(**kargs)
         if record_quality:
-            record.letter_annotations["phred_quality"] = \
-                convert_error_probability_arr_to_phred([1 - val for val in record_quality])
+            baseqv = convert_error_probability_arr_to_phred([1 - val for val in record_quality])
+            record.letter_annotations["phred_quality"] = baseqv
             SeqIO.write(record, self.file_obj, "fastq")
         else:
             SeqIO.write(record, self.file_obj, "fasta")

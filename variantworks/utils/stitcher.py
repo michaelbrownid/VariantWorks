@@ -30,17 +30,28 @@ def decode_consensus(probs, include_certainty_score=True):
     Returns:
         seq: sequence output from probabilities
     """
-    label_symbols = ["*", "A", "C", "G", "T"]  # Corresponding labels for each network output channel
+    #label_symbols = ["*", "A", "C", "G", "T"]  # Corresponding labels for each network output channel
+    # label_sybols are now 0:24 and represent match+insertFollow
+    # base2ind = {"A": 0, "a": 0, "C": 1, "c": 1, "G": 2, "g": 2, "T": 3, "t": 3, "-": 4}
+    # self.labelsTensor[ww,ii] = base2ind[matchbase]+5*base2ind[insertbase[0]]; 
+    # 0 = A+5*insA
+    # 1 = C+5*insA
+    # 24 = "" = -+5ins-
+    label_symbols = []
+    for insert in ["a","c","g","t",""]:
+        for match in ["A","C","G","T",""]:
+            label_symbols.append("%s%s" % (match,insert))
     seq = ''
     seq_quality = list()
     for i in range(len(probs)):
         base = probs[i, :]
         mp = np.argmax(base).item()
         nuc = label_symbols[mp]
-        if nuc != '*':
+        if nuc != "":
             seq += nuc
             if include_certainty_score:
                 seq_quality.append(base[mp].item())
+                if len(nuc)==2: seq_quality.append(base[mp].item()) # match+insert give same qv
     return seq, seq_quality if include_certainty_score else list()
 
 
