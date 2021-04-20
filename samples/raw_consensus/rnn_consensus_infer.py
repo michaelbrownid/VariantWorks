@@ -37,10 +37,11 @@ def infer(args):
     nf = nemo.core.NeuralModuleFactory(
         placement=nemo.core.neural_factory.DeviceType.GPU)
 
-    model = create_model.create_rnn_model(args.input_feature_size,
+    model = create_model.create_rnn_model_test(args.input_feature_size,
                                           args.num_output_logits,
                                           args.gru_size,
                                           args.gru_layers)
+    print("model.apply_softmax",model.apply_softmax)
 
     # Create train DAG
     infer_dataset = HDFDataLoader(args.infer_hdf, batch_size=32,

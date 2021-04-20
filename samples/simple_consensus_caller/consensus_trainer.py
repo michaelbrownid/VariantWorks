@@ -106,6 +106,7 @@ def train(args):
                          args.gru_size,
                          args.gru_layers,
                          args.kernel_size)
+    print("model.apply_softmax",model.apply_softmax)
 
     encoding_dims = ('B', 'W', 'C')
     label_dims = ('B', 'W')

@@ -28,7 +28,7 @@ from variantworks.io import fastxio
 from variantworks.neural_types import SummaryPileupNeuralType, HaploidNeuralType
 from variantworks.utils.stitcher import stitch, decode_consensus
 
-from create_model import create_model
+from create_model import create_model_test
 
 
 def infer(args):
@@ -37,7 +37,7 @@ def infer(args):
     nf = nemo.core.NeuralModuleFactory(
         placement=nemo.core.neural_factory.DeviceType.GPU)
 
-    model = create_model(model=args.model,
+    model = create_model_test(model=args.model,
                          input_feature_size=args.input_feature_size,
                          num_output_logits=args.num_output_logits,
                          gru_size=args.gru_size,

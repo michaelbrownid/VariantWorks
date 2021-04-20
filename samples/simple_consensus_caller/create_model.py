@@ -30,6 +30,26 @@ def create_model(model,
                              num_output_logits=num_output_logits,
                              gru_size=gru_size,
                              gru_layers=gru_layers,
+                             apply_softmax=False)
+    elif model == 'cnn':
+        model = ConsensusCNN(input_feature_size=input_feature_size,
+                             gru_size=gru_size,
+                             kernel_size=kernel_size,
+                             num_output_logits=num_output_logits)
+    return model
+
+def create_model_test(model,
+                 input_feature_size,
+                 num_output_logits,
+                 gru_size,
+                 gru_layers=None,
+                 kernel_size=None):
+    """Return neural network to train."""
+    if model == 'rnn':
+        model = ConsensusRNN(input_feature_size=input_feature_size,
+                             num_output_logits=num_output_logits,
+                             gru_size=gru_size,
+                             gru_layers=gru_layers,
                              apply_softmax=True)
     elif model == 'cnn':
         model = ConsensusCNN(input_feature_size=input_feature_size,

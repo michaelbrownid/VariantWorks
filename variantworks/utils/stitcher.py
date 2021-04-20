@@ -40,7 +40,12 @@ def decode_consensus(probs, include_certainty_score=True):
         outputtype="matchins25"
     elif mylen==5:
         outputtype="singlebase"
-    print("decode_consensus outputtype",outputtype)
+
+    # todo: doesn't work!
+    # only print on first invocation to cut down on output volume. Uses attribute on function
+    if not hasattr('decode_consensus', 'called'):
+        print("decode_consensus outputtype",outputtype)
+        setattr(decode_consensus, "called", "True")
 
     if outputtype=="matchins25":
         # label_sybols are now 0:24 and represent match+insertFollow

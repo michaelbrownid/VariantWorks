@@ -28,6 +28,20 @@ def create_rnn_model(input_feature_size,
                        num_output_logits=num_output_logits,
                        gru_size=gru_size,
                        gru_layers=gru_layers,
+                       apply_softmax=False)
+
+    return rnn
+
+def create_rnn_model_test(input_feature_size,
+                     num_output_logits,
+                     gru_size,
+                     gru_layers):
+    """Return neural network to train."""
+    # Neural Network
+    rnn = ConsensusRNN(input_feature_size=input_feature_size,
+                       num_output_logits=num_output_logits,
+                       gru_size=gru_size,
+                       gru_layers=gru_layers,
                        apply_softmax=True)
 
     return rnn
