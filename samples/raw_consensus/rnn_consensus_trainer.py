@@ -149,7 +149,7 @@ def train(args):
         # Checkpointing frequency in epochs
         #epoch_freq=512,
         # Number of checkpoints to keep
-        checkpoints_to_keep=16, # 999,
+        checkpoints_to_keep= 1024,
         # If True, CheckpointCallback will raise an Error if restoring fails
         force_load=False
     )

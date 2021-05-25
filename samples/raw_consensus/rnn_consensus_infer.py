@@ -70,7 +70,7 @@ def infer(args):
     # print("all_preds.length",len(all_preds), all_preds[0].shape)
     # all_preds.length 6278 torch.Size([1024, 25])
     h5_file = h5py.File(args.out_file+".h5", 'w')
-    h5_file.create_dataset('all_preds', data=np.stack(all_preds)) # all_preds                Dataset {6278, 1024, 25}
+    h5_file.create_dataset('all_preds', data=np.stack(all_preds),dtype="float32") # all_preds                Dataset {6278, 1024, 25}
     h5_file.close()
 
     # Get list of read_ids from hdf to calculate where read windows begin and end.
