@@ -18,6 +18,7 @@
 
 import argparse
 import itertools
+import datetime
 
 import h5py
 import nemo
@@ -53,26 +54,35 @@ def infer(args):
     encoding, positions = infer_dataset()
     vz = model(encoding=encoding)
 
+    timestart=datetime.datetime.now()
     results = nf.infer([vz, positions], checkpoint_dir=args.model_dir, verbose=True)
+    timeend=datetime.datetime.now()
+    #print("TIME: nf.infer", timeend-timestart)
 
+    timestart=datetime.datetime.now()
     prediction = results[0]
     position = results[1]
     assert(len(prediction) == len(position))
-
     # This loop flattens the NeMo output that's grouped by batches into a flat list.
     all_preds = []
     all_pos = []
     for pred, pos in zip(prediction, position):
         all_preds += pred
         all_pos += pos
+    timeend=datetime.datetime.now()
+    #print("TIME: flatten", timeend-timestart)
 
+    timestart=datetime.datetime.now()
     # dump h5 all_preds so I can join
     # print("all_preds.length",len(all_preds), all_preds[0].shape)
     # all_preds.length 6278 torch.Size([1024, 25])
     h5_file = h5py.File(args.out_file+".h5", 'w')
     h5_file.create_dataset('all_preds', data=np.stack(all_preds),dtype="float32") # all_preds                Dataset {6278, 1024, 25}
     h5_file.close()
+    timeend=datetime.datetime.now()
+    #print("TIME: h5Dump", timeend-timestart)
 
+    timestart=datetime.datetime.now()
     # Get list of read_ids from hdf to calculate where read windows begin and end.
     hdf = h5py.File(args.infer_hdf, "r")
     read_ids = hdf["read_ids"]
@@ -89,9 +99,12 @@ def infer(args):
 
     # Convert boundaries into intervals.
     read_intervals = [(read_boundaries[idx], read_boundaries[idx + 1]) for idx in range(len(read_boundaries)-1)]
+    timeend=datetime.datetime.now()
+    #print("TIME: read_intervals", timeend-timestart)
 
     with fastxio.FastxWriter(output_path=args.out_file, mode='w') as fastq_file:
         for begin, end in read_intervals:
+            timestart=datetime.datetime.now()
             read_id = read_ids[begin].decode("utf-8")
 
             # Generate a lists of stitched consensus sequences.
@@ -100,12 +113,16 @@ def infer(args):
             nucleotides_sequence, nucleotides_certainty = map(list, zip(*stitched_consensus_seq_parts))
             nucleotides_sequence = "".join(nucleotides_sequence)
             nucleotides_certainty = list(itertools.chain.from_iterable(nucleotides_certainty))
+            timeend=datetime.datetime.now()
+            #print("TIME: stitch", timeend-timestart)
 
             # Write out FASTQ sequence.
+            timestart=datetime.datetime.now()
             fastq_file.write_output(read_id, nucleotides_sequence,
                                     description="Generated consensus sequence by NVIDIA VariantWorks",
                                     record_quality=nucleotides_certainty)
-
+            timeend=datetime.datetime.now()
+            #print("TIME: writeFastq", timeend-timestart)
 
 def build_parser():
     """Build parser object with options for sample."""

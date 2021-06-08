@@ -65,47 +65,49 @@ def decode_consensus(probs, include_certainty_score=True):
         print("ERROR: decode_consensus outputtype not understood", outputtype)
         sys.exit(1)
 
-    seq = ''
-    seq_quality = list()
-    for i in range(len(probs)):
-        base = probs[i, :]
-        mp = np.argmax(base).item()
-        nuc = label_symbols[mp]
+    seq = []
+    seq_quality = []
+    # take max along softmax axis
+    mp = np.argmax(probs,1)
+    for ii in range(len(probs)):
+        nuc = label_symbols[mp[ii].item()]
         if nuc != "":
-            seq += nuc
+            seq.append(nuc)
             if include_certainty_score:
-                seq_quality.append(base[mp].item())
-                if len(nuc)==2: seq_quality.append(base[mp].item()) # match+insert give same qv for matchins25
+                myprob = probs[ii,mp[ii]].item()
+                seq_quality.append(myprob)
+                if len(nuc)==2: seq_quality.append(myprob) # match+insert give same qv for matchins25
+    seq="".join(seq)
     return seq, seq_quality if include_certainty_score else list()
 
+def posFind( key, data, hint=0 ):
+    """find key in data where data is sorted. data is (pos,0). short
+    linear search but keeps from running recursive search and getting
+    edge cases wrong
 
-def overlap_indices(first_positions_chunk, second_positions_chunk):
-    """Calculate overlap indices given two chunks.
-
-    Args:
-        first_positions_chunk: First positions chunk
-        second_positions_chunk: Second positions chunk
-    Returns:
-        padded_first_chunk_end_idx: End index of the current chunk
-        padded_second_chunk_start_idx: Start index of the next chunk
     """
-    first_chunk_overlap_start_idx = np.searchsorted(first_positions_chunk, second_positions_chunk[0])
-    second_chunk_overlap_end_idx = np.searchsorted(second_positions_chunk, first_positions_chunk[-1], side='right')
-    first_chunk_overlap_values = first_positions_chunk[first_chunk_overlap_start_idx:]
-    second_chunk_overlap_values = second_positions_chunk[0:second_chunk_overlap_end_idx]
-    if first_chunk_overlap_values.size != 0 and second_chunk_overlap_values.size != 0 and \
-            np.array_equal(first_chunk_overlap_values['inserted_pos'], second_chunk_overlap_values['inserted_pos']):
-        first_chunk_padding_size = round(len(first_chunk_overlap_values) / 2)
-        padded_first_chunk_end_idx = first_chunk_overlap_start_idx + first_chunk_padding_size
-        padded_second_chunk_start_idx = second_chunk_overlap_end_idx - (
-                len(first_chunk_overlap_values) - first_chunk_padding_size)
-        if all(np.concatenate([first_positions_chunk[first_chunk_overlap_start_idx:padded_first_chunk_end_idx],
-                               second_positions_chunk[padded_second_chunk_start_idx:second_chunk_overlap_end_idx]])
-               == first_chunk_overlap_values):
-            return padded_first_chunk_end_idx, padded_second_chunk_start_idx
-    raise ValueError("Can not Stitch {} {}".format(first_positions_chunk, second_positions_chunk))
 
+    index = hint
+    here = data[index][0]
+    if key[0] == here:
+        return(index)
 
+    if key[0] > here:
+        # go right
+        for index in range(hint+1,len(data),1):
+            here = data[index][0]
+            if key[0] == here:
+                return(index)
+        sys.exit(1)
+        
+    if key[0] < here:
+        # go left
+        for index in range(hint-1,-1,-1):
+            here = data[index][0]
+            if key[0] == here:
+                return(index)
+        sys.exit(1)
+        
 def stitch(probs, positions, decode_consensus_func):
     """Stitch predictions on chunks into a contiguous sequence.
 
@@ -114,27 +116,64 @@ def stitch(probs, positions, decode_consensus_func):
         positions: Corresponding list of position array for each chunk in probs.
         decode_consensus_func: A function which decodes each chunk from probs into label_symbols.
 
+    The current code appears to be much more complex than necessary!
+
+    Chunks are fixed window sizes with overlap. We trust the ends a
+    bit less because of reuced context. Note this is only one
+    way. Could take half.
+
+    [ Chunk0 positions ]                              
+    [**************)
+                ss0|   |ee1                        
+                   [ Chunk1 positions ]               
+                   [**************)
+                               ss1|   |ee2         
+                                  [ Chunk2 positions ]
+                                  [**************)
+                                              ss1|   |ee2         
+                                                 [ Chunk2 positions ]
+                                                 [******************]
+
+    ss = next_start_in_this
+    ee = this_end_in_next
+
     Returns:
         seq: Stitched consensus sequence
+
     """
+    windowHint=31
+    windowLen=len(positions[0])
+                  
     decoded_sequece_parts = list()
-    first_start_idx = 0
-    for i in range(1, len(positions), 1):
-        probabilities_chunk = probs[i - 1]
-        # Convert positions tensor into np.darray format expected for overlap_indices function
-        first_positions_chunk = np.array([(pos[0], pos[1]) for pos in positions[i - 1]],
-                                         dtype=[('reference_pos', '<i8'), ('inserted_pos', '<i8')])
-        second_positions_chunk = np.array([(pos[0], pos[1]) for pos in positions[i]],
-                                          dtype=[('reference_pos', '<i8'), ('inserted_pos', '<i8')])
-        # first_end_idx and second_start_idx are the new breaking points between two consecutive overlaps
-        # found by the overlap_indices function.
-        first_end_idx, second_start_idx = overlap_indices(first_positions_chunk, second_positions_chunk)
-        # Decoding chunk in i-1 position and adding to sequence
-        prev_decoded_seq = decode_consensus_func(probabilities_chunk[first_start_idx:first_end_idx])
-        decoded_sequece_parts.append(prev_decoded_seq)
-        # Handling last sequence
-        if i == len(positions) - 1:
-            current_decoded_seq = decode_consensus_func(probs[i][second_start_idx:])
-            decoded_sequece_parts.append(current_decoded_seq)
-        first_start_idx = second_start_idx
+
+    #### handle first
+    ii=0
+    first_start_idx=0
+    ss=posFind(positions[ii+1][0], positions[ii], max(0,windowLen-windowHint))
+    ee=posFind(positions[ii ][-1], positions[ii+1],min(windowLen,windowHint))
+    half = int(ee/2+0.5)
+    if len(positions)>1:
+        first_end_idx=ss+half
+    else:
+        first_end_idx=len(positions[ii])
+    second_start_idx=0+half
+    #print("first_start_idx, first_end_idx, second_start_id",first_start_idx, first_end_idx, second_start_idx)
+    decoded_seq = decode_consensus_func(probs[ii][first_start_idx:first_end_idx])
+    decoded_sequece_parts.append(decoded_seq)
+
+    #### handle interior
+    for ii in range(1, len(positions)):
+        first_start_idx=second_start_idx
+        if ii < len(positions)-1:
+            ss=posFind(positions[ii+1][0], positions[ii], max(0,windowLen-windowHint))
+            ee=posFind(positions[ii ][-1], positions[ii+1],min(windowLen,windowHint))
+            half = int(ee/2+0.5)
+            first_end_idx=ss+half
+        else:
+            first_end_idx=len(positions[ii])
+        second_start_idx=0+half
+        #print("first_start_idx, first_end_idx, second_start_id",first_start_idx, first_end_idx, second_start_idx)
+        decoded_seq = decode_consensus_func(probs[ii][first_start_idx:first_end_idx])
+        decoded_sequece_parts.append(decoded_seq)
+
     return decoded_sequece_parts
