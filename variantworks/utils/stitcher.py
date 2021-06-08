@@ -44,7 +44,7 @@ def decode_consensus(probs, include_certainty_score=True):
     # todo: doesn't work!
     # only print on first invocation to cut down on output volume. Uses attribute on function
     if not hasattr('decode_consensus', 'called'):
-        print("decode_consensus outputtype",outputtype)
+        #print("decode_consensus outputtype",outputtype)
         setattr(decode_consensus, "called", "True")
 
     if outputtype=="matchins25":

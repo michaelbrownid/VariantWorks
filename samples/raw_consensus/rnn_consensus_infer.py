@@ -44,7 +44,7 @@ def infer(args):
     print("model.apply_softmax",model.apply_softmax)
 
     # Create train DAG
-    infer_dataset = HDFDataLoader(args.infer_hdf, batch_size=32,
+    infer_dataset = HDFDataLoader(args.infer_hdf, batch_size=args.batch_size,
                                   shuffle=False, num_workers=1,
                                   tensor_keys=["features", "positions"],
                                   tensor_dims=[('B', 'W', 'C'), ('B', 'C')],
@@ -125,6 +125,7 @@ def build_parser():
     parser.add_argument("--num_output_logits", type=int, default=25)
     parser.add_argument("--gru_size", help="Number of units in RNN", type=int, default=128)
     parser.add_argument("--gru_layers", help="Number of layers in RNN", type=int, default=2)
+    parser.add_argument("--batch_size", help="batch size for GPU", type=int, default=32)
 
     return parser
 
