@@ -21,17 +21,17 @@ Combine chunk predictions into a sequence.
 from collections import namedtuple
 import numpy as np
 import sys
+import os
 
+# get debug from "global" os.environ
+if "DEBUG" in os.environ:
+    DEBUG=True
+else:
+    DEBUG=False
+    
 NucleotideCertainty = namedtuple('NucleotideCertainty', ['nucleotide_literal', 'nucleotide_certainty'])
 
-
-def decode_consensus(probs, include_certainty_score=True):
-    """Decode probabilities into sequence by choosing the Nucleotide base with the highest probability.
-
-    Returns:
-        seq: sequence output from probabilities
-    """
-
+if False:
     #### determine output type from length 25=outputtype=="matchins25" 5=outputtype=="singlebase"
     #### TODO: DANGEROUS implicit length == output type !!!
     outputtype="null"
@@ -65,12 +65,25 @@ def decode_consensus(probs, include_certainty_score=True):
         print("ERROR: decode_consensus outputtype not understood", outputtype)
         sys.exit(1)
 
+# define symbols once and use each decode_consensus call. Only works for matchins25
+label_symbols = []
+for insert in ["a","c","g","t",""]:
+    for match in ["A","C","G","T",""]:
+        label_symbols.append("%s%s" % (match,insert))
+
+def decode_consensus(probs, include_certainty_score=True):
+    """Decode probabilities into sequence by choosing the Nucleotide base with the highest probability.
+
+    Returns:
+        seq: sequence output from probabilities
+    """
+
     seq = []
     seq_quality = []
     # take max along softmax axis
     mp = np.argmax(probs,1)
     for ii in range(len(probs)):
-        nuc = label_symbols[mp[ii].item()]
+        nuc = label_symbols[mp[ii]]
         if nuc != "":
             seq.append(nuc)
             if include_certainty_score:
@@ -116,11 +129,9 @@ def stitch(probs, positions, decode_consensus_func):
         positions: Corresponding list of position array for each chunk in probs.
         decode_consensus_func: A function which decodes each chunk from probs into label_symbols.
 
-    The current code appears to be much more complex than necessary!
-
     Chunks are fixed window sizes with overlap. We trust the ends a
     bit less because of reuced context. Note this is only one
-    way. Could take half.
+    way.
 
     [ Chunk0 positions ]                              
     [**************)
@@ -149,15 +160,15 @@ def stitch(probs, positions, decode_consensus_func):
     #### handle first
     ii=0
     first_start_idx=0
-    ss=posFind(positions[ii+1][0], positions[ii], max(0,windowLen-windowHint))
-    ee=posFind(positions[ii ][-1], positions[ii+1],min(windowLen,windowHint))
-    half = int(ee/2+0.5)
     if len(positions)>1:
+        ss=posFind(positions[ii+1][0], positions[ii], max(0,windowLen-windowHint))
+        ee=posFind(positions[ii ][-1], positions[ii+1],min(windowLen,windowHint))
+        half = int(ee/2.0 + 0.5)
         first_end_idx=ss+half
     else:
         first_end_idx=len(positions[ii])
     second_start_idx=0+half
-    #print("first_start_idx, first_end_idx, second_start_id",first_start_idx, first_end_idx, second_start_idx)
+    if DEBUG: print("first_start_idx, first_end_idx, second_start_id",first_start_idx, first_end_idx, second_start_idx)
     decoded_seq = decode_consensus_func(probs[ii][first_start_idx:first_end_idx])
     decoded_sequece_parts.append(decoded_seq)
 
@@ -167,12 +178,12 @@ def stitch(probs, positions, decode_consensus_func):
         if ii < len(positions)-1:
             ss=posFind(positions[ii+1][0], positions[ii], max(0,windowLen-windowHint))
             ee=posFind(positions[ii ][-1], positions[ii+1],min(windowLen,windowHint))
-            half = int(ee/2+0.5)
+            half = int(ee/2.0 + 0.5)
             first_end_idx=ss+half
         else:
             first_end_idx=len(positions[ii])
         second_start_idx=0+half
-        #print("first_start_idx, first_end_idx, second_start_id",first_start_idx, first_end_idx, second_start_idx)
+        if DEBUG: print("first_start_idx, first_end_idx, second_start_id",first_start_idx, first_end_idx, second_start_idx)
         decoded_seq = decode_consensus_func(probs[ii][first_start_idx:first_end_idx])
         decoded_sequece_parts.append(decoded_seq)
 

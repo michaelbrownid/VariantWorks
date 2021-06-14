@@ -19,6 +19,7 @@
 import argparse
 import itertools
 import datetime
+import os
 
 import h5py
 import nemo
@@ -31,6 +32,12 @@ from variantworks.utils.stitcher import stitch, decode_consensus
 
 import create_model
 
+# get debug from "global" os.environ
+if "DEBUG" in os.environ:
+    DEBUG=True
+else:
+    DEBUG=False
+
 
 def infer(args):
     """Train a sample model with test data."""
@@ -42,7 +49,7 @@ def infer(args):
                                           args.num_output_logits,
                                           args.gru_size,
                                           args.gru_layers)
-    print("model.apply_softmax",model.apply_softmax)
+    if DEBUG: print("model.apply_softmax",model.apply_softmax)
 
     # Create train DAG
     infer_dataset = HDFDataLoader(args.infer_hdf, batch_size=args.batch_size,
@@ -57,7 +64,7 @@ def infer(args):
     timestart=datetime.datetime.now()
     results = nf.infer([vz, positions], checkpoint_dir=args.model_dir, verbose=True)
     timeend=datetime.datetime.now()
-    #print("TIME: nf.infer", timeend-timestart)
+    if DEBUG: print("TIME: nf.infer", timeend-timestart)
 
     timestart=datetime.datetime.now()
     prediction = results[0]
@@ -70,17 +77,18 @@ def infer(args):
         all_preds += pred
         all_pos += pos
     timeend=datetime.datetime.now()
-    #print("TIME: flatten", timeend-timestart)
+    if DEBUG: print("TIME: flatten", timeend-timestart)
 
-    timestart=datetime.datetime.now()
-    # dump h5 all_preds so I can join
-    # print("all_preds.length",len(all_preds), all_preds[0].shape)
-    # all_preds.length 6278 torch.Size([1024, 25])
-    h5_file = h5py.File(args.out_file+".h5", 'w')
-    h5_file.create_dataset('all_preds', data=np.stack(all_preds),dtype="float32") # all_preds                Dataset {6278, 1024, 25}
-    h5_file.close()
-    timeend=datetime.datetime.now()
-    #print("TIME: h5Dump", timeend-timestart)
+    if args.writeh5:
+        timestart=datetime.datetime.now()
+        # dump h5 all_preds so I can join
+        # print("all_preds.length",len(all_preds), all_preds[0].shape)
+        # all_preds.length 6278 torch.Size([1024, 25])
+        h5_file = h5py.File(args.out_file+".h5", 'w')
+        h5_file.create_dataset('all_preds', data=np.stack(all_preds),dtype="float32") # all_preds                Dataset {6278, 1024, 25}
+        h5_file.close()
+        timeend=datetime.datetime.now()
+        if DEBUG: print("TIME: h5Dump", timeend-timestart)
 
     timestart=datetime.datetime.now()
     # Get list of read_ids from hdf to calculate where read windows begin and end.
@@ -100,7 +108,7 @@ def infer(args):
     # Convert boundaries into intervals.
     read_intervals = [(read_boundaries[idx], read_boundaries[idx + 1]) for idx in range(len(read_boundaries)-1)]
     timeend=datetime.datetime.now()
-    #print("TIME: read_intervals", timeend-timestart)
+    if DEBUG: print("TIME: read_intervals", timeend-timestart)
 
     with fastxio.FastxWriter(output_path=args.out_file, mode='w') as fastq_file:
         for begin, end in read_intervals:
@@ -114,7 +122,7 @@ def infer(args):
             nucleotides_sequence = "".join(nucleotides_sequence)
             nucleotides_certainty = list(itertools.chain.from_iterable(nucleotides_certainty))
             timeend=datetime.datetime.now()
-            #print("TIME: stitch", timeend-timestart)
+            if DEBUG: print("TIME: stitch", timeend-timestart)
 
             # Write out FASTQ sequence.
             timestart=datetime.datetime.now()
@@ -122,7 +130,7 @@ def infer(args):
                                     description="Generated consensus sequence by NVIDIA VariantWorks",
                                     record_quality=nucleotides_certainty)
             timeend=datetime.datetime.now()
-            #print("TIME: writeFastq", timeend-timestart)
+            if DEBUG: print("TIME: writeFastq", timeend-timestart)
 
 def build_parser():
     """Build parser object with options for sample."""
@@ -143,6 +151,7 @@ def build_parser():
     parser.add_argument("--gru_size", help="Number of units in RNN", type=int, default=128)
     parser.add_argument("--gru_layers", help="Number of layers in RNN", type=int, default=2)
     parser.add_argument("--batch_size", help="batch size for GPU", type=int, default=32)
+    parser.add_argument("--writeh5", default=False, action="store_true")
 
     return parser
 
